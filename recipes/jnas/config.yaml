@@ -10,7 +10,7 @@ test_root: /home/barb_cinnamon_is/jnas_hy-parsed
 test_manifest: /home/barb_cinnamon_is/jnas_hy-parsed/test_manifest.csv
 path:
   log: "./log"
-  checkpoint: "./checkpoint"  # dir to save model
+  checkpoint: "./checkpoint" # dir to save model
 
 data:
   audio_sampling_rate: 16000
@@ -39,7 +39,3 @@ inference:
   dict_coeff: 0.2
   ban_dict_coeff: 0.0
   epoch_index: 4
-
-  
-
-

@@ -1,4 +1,4 @@
-This directory supplements the paper with more details on how we prepared the data for evaluation, to help replicate our experiments. 
+This directory supplements the paper with more details on how we prepared the data for evaluation, to help replicate our experiments.
 
 ## Short-form English-only datasets
 
@@ -30,7 +30,6 @@ while read name cmd; do
 done < wav.scp
 ```
 
-
 ### WSJ
 
 We used [LDC93S6B](https://catalog.ldc.upenn.edu/LDC93S6B) and [LDC94S13B](https://catalog.ldc.upenn.edu/LDC94S13B) and followed the [s5 recipe](https://github.com/kaldi-asr/kaldi/tree/master/egs/wsj/s5) to preprocess the dataset.
@@ -47,15 +46,14 @@ We downloaded the [CHiME-5 dataset](https://spandh.dcs.shef.ac.uk//chime_challen
 
 We preprocessed the [AMI Corpus](https://groups.inf.ed.ac.uk/ami/corpus/overview.shtml) by following the stage 0 ad 2 of the [s5b recipe](https://github.com/kaldi-asr/kaldi/tree/master/egs/ami/s5b).
 
-
 ## Long-form English-only datasets
 
 ### TED-LIUM 3
 
-To create a long-form transcription dataset from the [TED-LIUM3](https://www.openslr.org/51/) dataset, we sliced the audio between the beginning of the first labeled segment and the end of the last labeled segment of each talk, and we used the concatenated text as the label. Below are the timestamps used for slicing each of the 11 TED talks in the test split.   
+To create a long-form transcription dataset from the [TED-LIUM3](https://www.openslr.org/51/) dataset, we sliced the audio between the beginning of the first labeled segment and the end of the last labeled segment of each talk, and we used the concatenated text as the label. Below are the timestamps used for slicing each of the 11 TED talks in the test split.
 
 | Filename            | Begin time (s) | End time (s) |
-|---------------------|----------------|--------------|
+| ------------------- | -------------- | ------------ |
 | DanBarber_2010      | 16.09          | 1116.24      |
 | JaneMcGonigal_2010  | 15.476         | 1187.61      |
 | BillGates_2010      | 15.861         | 1656.94      |
@@ -94,7 +92,6 @@ For these datasets, we used the files available in [the speech-datasets reposito
 
 We used the 231 interviews from [CORAAL (v. 2021.07)](https://oraal.uoregon.edu/coraal) and used the full-length interview files and transcripts.
 
-
 ## Multilingual datasets
 
 ### Multilingual LibriSpeech
@@ -103,11 +100,11 @@ We used the test splits from each language in [the Multilingual LibriSpeech (MLS
 
 ### Fleurs
 
-We collected audio files and transcripts using the implementation available as [HuggingFace datasets](https://huggingface.co/datasets/google/fleurs/blob/main/fleurs.py). To use as a translation dataset, we matched the numerical utterance IDs to find the corresponding transcript in English.   
+We collected audio files and transcripts using the implementation available as [HuggingFace datasets](https://huggingface.co/datasets/google/fleurs/blob/main/fleurs.py). To use as a translation dataset, we matched the numerical utterance IDs to find the corresponding transcript in English.
 
 ### VoxPopuli
 
-We used the `get_asr_data.py` script from [the official repository](https://github.com/facebookresearch/voxpopuli) to collect the ASR data in 14 languages. 
+We used the `get_asr_data.py` script from [the official repository](https://github.com/facebookresearch/voxpopuli) to collect the ASR data in 14 languages.
 
 ### Common Voice 9
 

@@ -6,7 +6,6 @@ from functools import cached_property, lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import tiktoken
-from tiktoken_ext.openai_public import gpt2
 
 LANGUAGES = {
     "en": "english",

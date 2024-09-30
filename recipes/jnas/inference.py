@@ -1,33 +1,35 @@
-import yaml
-from pathlib import Path
-import torch
-from tqdm import tqdm
-import evaluate
 import csv
-
 import sys
+from pathlib import Path
+
+import evaluate
+import torch
+import yaml
+from tqdm import tqdm
 
 sys.path.append(str(Path(__file__).resolve().absolute().parents[2]))
-from whisper_main import whisper
-
-from whisper_finetune.dataset import WhisperASRDataset, WhisperASRDataCollator, WhisperFolderNoTextASRDataset
+from whisper_finetune.dataset import WhisperASRDataCollator, WhisperASRDataset
 from whisper_finetune.model import WhisperModelModule
+
+from whisper_main import whisper
 
 
 def inference():
-    # load config 
+    # load config
     config_path = Path("config.yaml")
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     # dirs and paths
-    checkpoint_dir = Path(config["path"]["checkpoint"])
+    Path(config["path"]["checkpoint"])
     with_timestamps = bool(config["data"]["timestamps"])
     prompt_str = "はい、日本語で"
     if config["data"]["dict_path"] is not None and config["inference"]["using_prompt"]:
-        with open(config["data"]["dict_path"], 'r', encoding="utf8", newline='') as f_dict:
+        with open(
+            config["data"]["dict_path"], "r", encoding="utf8", newline=""
+        ) as f_dict:
             reader = csv.reader(f_dict)
             for row in reader:
-                prompt_str += '、'
+                prompt_str += "、"
                 dict_word = row[0]
                 prompt_str += f"{dict_word}"
             prompt_str += "の単語をすべて含むテキストを生成します。"
@@ -39,11 +41,12 @@ def inference():
 
     # tools
     whisper_options = whisper.DecodingOptions(
-        language=config["data"]["lang"], without_timestamps=not with_timestamps,
+        language=config["data"]["lang"],
+        without_timestamps=not with_timestamps,
         beam_size=5,
         prompt=prompt_str,
         dict_path=config["data"]["dict_path"],
-        dict_coeff=config["inference"]["dict_coeff"]
+        dict_coeff=config["inference"]["dict_coeff"],
     )
     whisper_tokenizer = whisper.tokenizer.get_tokenizer(
         True, language=config["data"]["lang"], task=whisper_options.task
@@ -52,24 +55,27 @@ def inference():
     # list
     # dataset = WhisperASRDataset(config["test_manifest"], config["test_root"], whisper_tokenizer)
     # dataset= WhisperFolderNoTextASRDataset(config["test_root"], whisper_tokenizer)
-    dataset = WhisperASRDataset(config["test_manifest"], config["test_root"], whisper_tokenizer)
+    dataset = WhisperASRDataset(
+        config["test_manifest"], config["test_root"], whisper_tokenizer
+    )
 
     loader = torch.utils.data.DataLoader(
-        dataset, batch_size=1,
-        collate_fn=WhisperASRDataCollator()
+        dataset, batch_size=1, collate_fn=WhisperASRDataCollator()
     )
 
     # load models
-    epoch = config["inference"]["epoch_index"]
+    config["inference"]["epoch_index"]
     # checkpoint_path = checkpoint_dir / "checkpoint" / f"srqu-checkpoint-epoch={epoch:04d}.ckpt"
     # state_dict = torch.load(checkpoint_path)
     # state_dict = state_dict['state_dict']
     whisper_model = WhisperModelModule(
-        config["train_manifest"], config["train_root"],
-        config["val_manifest"], config["val_root"],
+        config["train_manifest"],
+        config["train_root"],
+        config["val_manifest"],
+        config["val_root"],
         config["train"],
         model_name=config["model_name"],
-        lang=config["data"]["lang"]
+        lang=config["data"]["lang"],
     )
     # whisper_model.load_state_dict(state_dict)
 
@@ -100,12 +106,12 @@ def inference():
     #     print(f"reference:  {r}")
     #     print(f"hypothesis: {h}")
 
-    with open("hypo.csv", 'w') as fo:
+    with open("hypo.csv", "w") as fo:
         for id, h in zip(utt_ids, hyp):
-            fo.write(id + '\t' + h + '\n')
-    with open("ref.csv", 'w') as fo:
+            fo.write(id + "\t" + h + "\n")
+    with open("ref.csv", "w") as fo:
         for id, r in zip(utt_ids, ref):
-            fo.write(id + '\t' + r + '\n')
+            fo.write(id + "\t" + r + "\n")
 
     # compute CER
     cer_metrics = evaluate.load("cer")

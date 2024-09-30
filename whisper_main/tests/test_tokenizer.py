@@ -1,5 +1,4 @@
 import pytest
-
 from whisper.tokenizer import get_tokenizer
 
 

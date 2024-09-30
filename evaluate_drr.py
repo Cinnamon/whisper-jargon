@@ -1,11 +1,13 @@
 import re
 
-from hy_utils import read_two_column_data, JapaneseTextNormalizer
+from hy_utils import read_two_column_data
+
 from whisper_main.whisper.normalizers import EnglishTextNormalizer
 
 
 def check_valid_jp_word(word):
     return re.search("[一-龯ぁ-ゖァ-ヺ０-９Ａ-Ｚａ-ｚ々ーa-zA-Z0-9]", word)
+
 
 def calculate_drr(dictionary, references, predictions):
     # Initialize counters
@@ -37,7 +39,8 @@ def calculate_drr(dictionary, references, predictions):
     else:
         return total_correctly_recognized / total_should_recognize
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     # jp_normalizer = JapaneseTextNormalizer()
     en_normalizer = EnglishTextNormalizer()
 
@@ -48,10 +51,11 @@ if __name__=="__main__":
     pred_path = "recipes/libri/hypo_ngram_small_no_dict_2.csv"
     gold_path = "recipes/libri/ref_ngram_small_no_dict_2.csv"
 
-
     gold_data = read_two_column_data(gold_path)
     pred_data = read_two_column_data(pred_path)
-    assert len(gold_data) == len(pred_data), f"Length mismatch: {len(gold_data)} vs {len(pred_data)}"
+    assert len(gold_data) == len(
+        pred_data
+    ), f"Length mismatch: {len(gold_data)} vs {len(pred_data)}"
 
     lines = open(dict_path, mode="r", encoding="utf-8").readlines()
     # word_dict = [line.strip() for line in lines if check_valid_jp_word(line.strip())]
@@ -62,10 +66,11 @@ if __name__=="__main__":
     references = []
 
     for gold_utt, pred_utt in zip(gold_data, pred_data):
-        assert gold_utt[0] == pred_utt[0], f"Utterance names do not match: {gold_utt[0]} vs {pred_utt[0]}"
+        assert (
+            gold_utt[0] == pred_utt[0]
+        ), f"Utterance names do not match: {gold_utt[0]} vs {pred_utt[0]}"
         references.append(en_normalizer(gold_utt[1]))
         predictions.append(en_normalizer(pred_utt[1]))
-
 
     drr = calculate_drr(word_dict, references, predictions)
     print(f"DRR: {drr}")

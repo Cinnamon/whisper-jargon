@@ -3,7 +3,6 @@ from functools import lru_cache
 from subprocess import CalledProcessError, run
 from typing import Optional, Union
 
-import ffmpeg
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -141,7 +140,6 @@ def log_mel_spectrogram(
         if isinstance(audio, str):
             audio = load_audio(audio)
         audio = torch.from_numpy(audio)
-
 
     if device is not None:
         audio = audio.to(device)

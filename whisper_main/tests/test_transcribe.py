@@ -2,7 +2,6 @@ import os
 
 import pytest
 import torch
-
 import whisper
 from whisper.tokenizer import get_tokenizer
 

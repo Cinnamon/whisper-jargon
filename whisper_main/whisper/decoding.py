@@ -1,18 +1,17 @@
-from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple, Union
-from collections import defaultdict
-
-import sys
-from pathlib import Path
 import csv
+import sys
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+
 sys.path.append(str(Path(__file__).resolve().absolute().parents[2]))
 
+import kenlm
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.distributions import Categorical
-import kenlm
 
 from .audio import CHUNK_LENGTH
 from .tokenizer import Tokenizer, get_tokenizer
@@ -21,19 +20,23 @@ from .utils import compression_ratio
 if TYPE_CHECKING:
     from .model import Whisper
 
+
 class DictTrie:
     def __init__(self):
-        self.next_at_sequence = {}# Dictionary of list next tokens at current sequence
-        self.backoff_at_sequence = {} #Dictionary of integer of backoff token sequence if we could not find matching token.
-        self.end_at_sequence = {} # Dictionary of boolean val
+        self.next_at_sequence = {}  # Dictionary of list next tokens at current sequence
+        self.backoff_at_sequence = (
+            {}
+        )  # Dictionary of integer of backoff token sequence if we could not find matching token.
+        self.end_at_sequence = {}  # Dictionary of boolean val
 
         self.next_at_sequence.update({(): []})
         self.backoff_at_sequence.update({(): ()})
         self.end_at_sequence.update({(): []})
+
     def add_sequence(self, input_token_sequence: List):
 
         for i in range(1, len(input_token_sequence)):
-            prev_tuple_seq = tuple(input_token_sequence[:i-1])
+            prev_tuple_seq = tuple(input_token_sequence[: i - 1])
             tuple_seq = tuple(input_token_sequence[:i])
             # print(i, input_token_sequence, prev_tuple_seq, tuple_seq)
             if tuple_seq not in self.next_at_sequence:
@@ -50,7 +53,7 @@ class DictTrie:
             seq = q.pop()
             for next_seq in self.next_at_sequence[seq]:
 
-                #build backoff
+                # build backoff
                 seq_backoff = self.backoff_at_sequence[seq]
                 potential_backoff = seq_backoff + (next_seq[-1],)
                 while potential_backoff not in self.next_at_sequence:
@@ -63,10 +66,12 @@ class DictTrie:
                 else:
                     self.backoff_at_sequence[next_seq] = ()
 
-                #Build end_at substring
+                # Build end_at substring
                 next_seq_backoff = self.backoff_at_sequence[next_seq]
                 if len(next_seq_backoff) > 0:
-                    self.end_at_sequence[next_seq] += self.end_at_sequence[next_seq_backoff]
+                    self.end_at_sequence[next_seq] += self.end_at_sequence[
+                        next_seq_backoff
+                    ]
 
                 q.append(next_seq)
 
@@ -76,7 +81,7 @@ class KenNgramLM(object):
         self.model = kenlm.LanguageModel(arpa_path)
 
     def get_score(self, sequence: List[int]):
-        str_sequence = ' '.join([str(x) for x in sequence])
+        str_sequence = " ".join([str(x) for x in sequence])
         return self.model.score(str_sequence) / np.log10(np.e)
 
 
@@ -215,7 +220,6 @@ class Inference:
 
     def cleanup_caching(self) -> None:
         """Clean up any resources or hooks after decoding is finished"""
-        pass
 
 
 class PyTorchInference(Inference):
@@ -295,7 +299,12 @@ class TokenDecoder:
         """Initialize any stateful variables for decoding a new sequence"""
 
     def update(
-        self, tokens: Tensor, logits: Tensor, sum_logprobs: Tensor, dict_logprobs: List[List[float]], ban_dict_logprobs: List[List[float]]
+        self,
+        tokens: Tensor,
+        logits: Tensor,
+        sum_logprobs: Tensor,
+        dict_logprobs: List[List[float]],
+        ban_dict_logprobs: List[List[float]],
     ) -> Tuple[Tensor, bool]:
         """Specify how to select the next token, based on the current trace and logits
 
@@ -352,7 +361,12 @@ class GreedyDecoder(TokenDecoder):
         self.eot = eot
 
     def update(
-        self, tokens: Tensor, logits: Tensor, sum_logprobs: Tensor, dict_logprobs: List[List[float]], ban_dict_logprobs: List[List[float]]
+        self,
+        tokens: Tensor,
+        logits: Tensor,
+        sum_logprobs: Tensor,
+        dict_logprobs: List[List[float]],
+        ban_dict_logprobs: List[List[float]],
     ) -> Tuple[Tensor, bool]:
         if self.temperature == 0:
             next_tokens = logits.argmax(dim=-1)
@@ -375,7 +389,6 @@ class GreedyDecoder(TokenDecoder):
         return tokens, sum_logprobs.tolist()
 
 
-
 class BeamSearchDecoder(TokenDecoder):
     def __init__(
         self,
@@ -389,7 +402,7 @@ class BeamSearchDecoder(TokenDecoder):
         ban_dict_path: str = None,
         ban_dict_coeff: float = 0.0,
         ngram_path: str = None,
-        ngram_coeff: float = 0.0
+        ngram_coeff: float = 0.0,
     ):
         self.beam_size = beam_size
         self.eot = eot
@@ -417,8 +430,8 @@ class BeamSearchDecoder(TokenDecoder):
         self.ngram_coeff = ngram_coeff
 
     def read_data_for_boost_dictionary(self, dict_path: str):
-        with open(dict_path, newline='') as f_csv:
-            reader = csv.reader(f_csv, delimiter='\t')
+        with open(dict_path, newline="") as f_csv:
+            reader = csv.reader(f_csv, delimiter="\t")
             for row in reader:
                 tokens = self.tokenizer.encode(row[0])
 
@@ -427,8 +440,8 @@ class BeamSearchDecoder(TokenDecoder):
         self.boost_dictionary.build_backoff()
 
     def read_data_for_ban_dictionary(self, ban_dict_path: str):
-        with open(ban_dict_path, newline='') as f_csv:
-            reader = csv.reader(f_csv, delimiter='\t')
+        with open(ban_dict_path, newline="") as f_csv:
+            reader = csv.reader(f_csv, delimiter="\t")
             for row in reader:
                 tokens = self.tokenizer.encode(row[0])
 
@@ -440,7 +453,12 @@ class BeamSearchDecoder(TokenDecoder):
         self.finished_sequences = None
 
     def update(
-        self, tokens: Tensor, logits: Tensor, sum_logprobs: Tensor, dict_logprobs: List[List[float]], ban_dict_logprobs: List[List[float]]
+        self,
+        tokens: Tensor,
+        logits: Tensor,
+        sum_logprobs: Tensor,
+        dict_logprobs: List[List[float]],
+        ban_dict_logprobs: List[List[float]],
     ) -> Tuple[Tensor, bool]:
         if tokens.shape[0] % self.beam_size != 0:
             raise ValueError(f"{tokens.shape}[0] % {self.beam_size} != 0")
@@ -452,67 +470,130 @@ class BeamSearchDecoder(TokenDecoder):
         logprobs = F.log_softmax(logits.float(), dim=-1)
         next_tokens, source_indices, finished_sequences = [], [], []
         for i in range(n_audio):
-            scores, seq_dict_scores, seq_ban_dict_scores, total_scores, sources, finished,  = {}, {}, {}, {}, {}, {}
+            (
+                scores,
+                seq_dict_scores,
+                seq_ban_dict_scores,
+                total_scores,
+                sources,
+                finished,
+            ) = (
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+            )
 
             # STEP 1: calculate the cumulative log probabilities for possible candidates
             for j in range(self.beam_size):
                 idx = i * self.beam_size + j
                 prefix = tokens[idx].tolist()
                 # print(logprobs[idx].size())
-                for logprob, token in zip(*logprobs[idx].topk(3*self.beam_size + 1)):
-                # for logprob, token in zip(*logprobs[idx].topk(logprobs[idx].shape[-1])):
+                for logprob, token in zip(*logprobs[idx].topk(3 * self.beam_size + 1)):
+                    # for logprob, token in zip(*logprobs[idx].topk(logprobs[idx].shape[-1])):
                     new_logprob = (sum_logprobs[idx] + logprob).item()
                     sequence = tuple(prefix + [token.item()])
                     new_dict_logprob = dict_logprobs[idx] + [logprob.item()]
                     new_ban_dict_logprob = ban_dict_logprobs[idx] + [logprob.item()]
                     # We advance current word in dictionary in trie by check if current sequence exists
-                    dictionary_sequence = sequence[-len(new_dict_logprob):]
+                    dictionary_sequence = sequence[-len(new_dict_logprob) :]
                     temp_boost_score = 0
-                    if dictionary_sequence not in self.boost_dictionary.next_at_sequence:
+                    if (
+                        dictionary_sequence
+                        not in self.boost_dictionary.next_at_sequence
+                    ):
                         # If the current sequence does not exist, we find a suffix of current sequence which matches
                         # a prefix of words in dictionary
                         if tuple(prefix) in self.boost_dictionary.next_at_sequence:
-                            backoff_sequence = self.boost_dictionary.backoff_at_sequence[tuple(prefix)]
+                            backoff_sequence = (
+                                self.boost_dictionary.backoff_at_sequence[tuple(prefix)]
+                            )
                             potential_suffix = backoff_sequence + (token.item(),)
-                            while potential_suffix not in self.boost_dictionary.next_at_sequence:
-                                backoff_sequence = self.boost_dictionary.backoff_at_sequence[backoff_sequence]
+                            while (
+                                potential_suffix
+                                not in self.boost_dictionary.next_at_sequence
+                            ):
+                                backoff_sequence = (
+                                    self.boost_dictionary.backoff_at_sequence[
+                                        backoff_sequence
+                                    ]
+                                )
                                 potential_suffix = backoff_sequence + (token.item(),)
                                 # If we satifies this condition, it means that the current sequence does not match any word in dictionary
-                                if backoff_sequence == self.boost_dictionary.backoff_at_sequence[backoff_sequence]:
+                                if (
+                                    backoff_sequence
+                                    == self.boost_dictionary.backoff_at_sequence[
+                                        backoff_sequence
+                                    ]
+                                ):
                                     break
                             dictionary_sequence = potential_suffix
-                            if dictionary_sequence not in self.boost_dictionary.next_at_sequence:
+                            if (
+                                dictionary_sequence
+                                not in self.boost_dictionary.next_at_sequence
+                            ):
                                 dictionary_sequence = tuple()
                         else:
-                             dictionary_sequence = tuple()
+                            dictionary_sequence = tuple()
 
                     if len(dictionary_sequence) == 0:
                         new_dict_logprob = []
                     else:
-                        new_dict_logprob = new_dict_logprob[-len(dictionary_sequence):]
+                        new_dict_logprob = new_dict_logprob[-len(dictionary_sequence) :]
                         perma_boost_score = 0
-                        for end_length in self.boost_dictionary.end_at_sequence[dictionary_sequence]:
+                        for end_length in self.boost_dictionary.end_at_sequence[
+                            dictionary_sequence
+                        ]:
                             perma_boost_score += sum(new_dict_logprob[-end_length:])
-                        new_logprob = new_logprob - self.boost_coeff*perma_boost_score
-                        if len(self.boost_dictionary.next_at_sequence[dictionary_sequence]) > 0:
+                        new_logprob = new_logprob - self.boost_coeff * perma_boost_score
+                        if (
+                            len(
+                                self.boost_dictionary.next_at_sequence[
+                                    dictionary_sequence
+                                ]
+                            )
+                            > 0
+                        ):
                             temp_boost_score = sum(new_dict_logprob)
 
-                    ban_dictionary_sequence = sequence[-len(new_ban_dict_logprob):]
+                    ban_dictionary_sequence = sequence[-len(new_ban_dict_logprob) :]
                     temp_ban_score = 0
-                    if ban_dictionary_sequence not in self.ban_dictionary.next_at_sequence:
+                    if (
+                        ban_dictionary_sequence
+                        not in self.ban_dictionary.next_at_sequence
+                    ):
                         # If the current sequence does not exist, we find a suffix of current sequence which matches
                         # a prefix of words in dictionary
                         if tuple(prefix) in self.ban_dictionary.next_at_sequence:
-                            backoff_sequence = self.ban_dictionary.backoff_at_sequence[tuple(prefix)]
+                            backoff_sequence = self.ban_dictionary.backoff_at_sequence[
+                                tuple(prefix)
+                            ]
                             potential_suffix = backoff_sequence + (token.item(),)
-                            while potential_suffix not in self.ban_dictionary.next_at_sequence:
-                                backoff_sequence = self.ban_dictionary.backoff_at_sequence[backoff_sequence]
+                            while (
+                                potential_suffix
+                                not in self.ban_dictionary.next_at_sequence
+                            ):
+                                backoff_sequence = (
+                                    self.ban_dictionary.backoff_at_sequence[
+                                        backoff_sequence
+                                    ]
+                                )
                                 potential_suffix = backoff_sequence + (token.item(),)
                                 # If we satifies this condition, it means that the current sequence does not match any word in dictionary
-                                if backoff_sequence == self.ban_dictionary.backoff_at_sequence[backoff_sequence]:
+                                if (
+                                    backoff_sequence
+                                    == self.ban_dictionary.backoff_at_sequence[
+                                        backoff_sequence
+                                    ]
+                                ):
                                     break
                             ban_dictionary_sequence = potential_suffix
-                            if ban_dictionary_sequence not in self.ban_dictionary.next_at_sequence:
+                            if (
+                                ban_dictionary_sequence
+                                not in self.ban_dictionary.next_at_sequence
+                            ):
                                 ban_dictionary_sequence = tuple()
                         else:
                             ban_dictionary_sequence = tuple()
@@ -520,17 +601,34 @@ class BeamSearchDecoder(TokenDecoder):
                     if len(ban_dictionary_sequence) == 0:
                         new_ban_dict_logprob = []
                     else:
-                        new_ban_dict_logprob = new_ban_dict_logprob[-len(ban_dictionary_sequence):]
+                        new_ban_dict_logprob = new_ban_dict_logprob[
+                            -len(ban_dictionary_sequence) :
+                        ]
                         perma_ban_score = 0
-                        for end_length in self.ban_dictionary.end_at_sequence[ban_dictionary_sequence]:
+                        for end_length in self.ban_dictionary.end_at_sequence[
+                            ban_dictionary_sequence
+                        ]:
                             perma_ban_score += sum(new_ban_dict_logprob[-end_length:])
                         new_logprob = new_logprob - self.ban_coeff * perma_ban_score
-                        if len(self.ban_dictionary.next_at_sequence[ban_dictionary_sequence]) > 0:
+                        if (
+                            len(
+                                self.ban_dictionary.next_at_sequence[
+                                    ban_dictionary_sequence
+                                ]
+                            )
+                            > 0
+                        ):
                             temp_ban_score = sum(new_ban_dict_logprob)
 
-                    total_scores[sequence] = new_logprob - self.boost_coeff*temp_boost_score - self.ban_coeff*temp_ban_score
+                    total_scores[sequence] = (
+                        new_logprob
+                        - self.boost_coeff * temp_boost_score
+                        - self.ban_coeff * temp_ban_score
+                    )
                     if self.ngram:
-                        total_scores[sequence] = total_scores[sequence] - self.ngram_coeff*self.ngram.get_score(list(sequence))
+                        total_scores[sequence] = total_scores[
+                            sequence
+                        ] - self.ngram_coeff * self.ngram.get_score(list(sequence))
                     seq_dict_scores[sequence] = new_dict_logprob
                     seq_ban_dict_scores[sequence] = new_ban_dict_logprob
                     scores[sequence] = new_logprob
@@ -738,9 +836,17 @@ class DecodingTask:
         # decoder: implements how to select the next tokens, given the autoregressive distribution
         if options.beam_size is not None:
             self.decoder = BeamSearchDecoder(
-                options.beam_size, tokenizer.eot, self.inference, options.patience, self.tokenizer,
-                options.dict_path, options.dict_coeff, options.ban_dict_path, options.ban_dict_coeff,
-                options.ngram_path, options.ngram_coeff
+                options.beam_size,
+                tokenizer.eot,
+                self.inference,
+                options.patience,
+                self.tokenizer,
+                options.dict_path,
+                options.dict_coeff,
+                options.ban_dict_path,
+                options.ban_dict_coeff,
+                options.ngram_path,
+                options.ngram_coeff,
             )
         else:
             self.decoder = GreedyDecoder(options.temperature, tokenizer.eot)
@@ -896,8 +1002,9 @@ class DecodingTask:
                     logit_filter.apply(logits, tokens)
 
                 # expand the tokens tensor with the selected next tokens
-                tokens, completed = self.decoder.update(tokens, logits, sum_logprobs,
-                                                        boost_dict_logprobs, ban_dict_logprobs)
+                tokens, completed = self.decoder.update(
+                    tokens, logits, sum_logprobs, boost_dict_logprobs, ban_dict_logprobs
+                )
 
                 if completed or tokens.shape[-1] > self.n_ctx:
                     break

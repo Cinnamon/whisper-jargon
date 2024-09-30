@@ -1,7 +1,6 @@
 import os.path
 
 import numpy as np
-
 from whisper.audio import SAMPLE_RATE, load_audio, log_mel_spectrogram
 
 

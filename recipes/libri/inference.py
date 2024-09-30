@@ -1,39 +1,42 @@
-import yaml
-from pathlib import Path
-import torch
-from tqdm import tqdm
-import evaluate
 import csv
 import string
 import sys
+from pathlib import Path
+
+import evaluate
+import torch
+import yaml
+from tqdm import tqdm
 
 sys.path.append(str(Path(__file__).resolve().absolute().parents[2]))
+from whisper_finetune.dataset import WhisperASRDataCollator, WhisperASRDataset
+from whisper_finetune.model import WhisperModelModule
+
 from whisper_main import whisper
 from whisper_main.whisper.transcribe import transcribe
-from whisper_finetune.dataset import WhisperASRDataset, WhisperASRDataCollator, WhisperFolderNoTextASRDataset
-from whisper_finetune.model import WhisperModelModule
-from whisper_main.whisper.normalizers import EnglishTextNormalizer
-from hy_utils import read_two_column_data
-
 
 
 def inference():
-    # load config 
+    # load config
     config_path = Path("config.yaml")
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     # dirs and paths
-    checkpoint_dir = Path(config["path"]["checkpoint"])
+    Path(config["path"]["checkpoint"])
     with_timestamps = bool(config["data"]["timestamps"])
     prompt_str = ""
     if config["data"]["dict_path"] is not None and config["inference"]["using_prompt"]:
-        with open(config["data"]["dict_path"], 'r', encoding="utf8", newline='') as f_dict:
+        with open(
+            config["data"]["dict_path"], "r", encoding="utf8", newline=""
+        ) as f_dict:
             reader = csv.reader(f_dict)
             for row in reader:
-                prompt_str += ', '
+                prompt_str += ", "
                 dict_word = row[0]
                 prompt_str += f"{dict_word}"
-            prompt_str += "Generate a text that contains all the words in the dictionary."
+            prompt_str += (
+                "Generate a text that contains all the words in the dictionary."
+            )
     else:
         prompt_str = None
 
@@ -44,13 +47,14 @@ def inference():
     print(f"Using prompt: {prompt_str}")
     print(f"Using dict path: {config['data']['dict_path']}")
     whisper_options = whisper.DecodingOptions(
-        language=config["data"]["lang"], without_timestamps=not with_timestamps,
+        language=config["data"]["lang"],
+        without_timestamps=not with_timestamps,
         beam_size=5,
         prompt=prompt_str,
         dict_path=config["data"]["dict_path"],
         dict_coeff=config["inference"]["dict_coeff"],
         ngram_path=None,
-        ngram_coeff=0.001
+        ngram_coeff=0.001,
     )
     whisper_tokenizer = whisper.tokenizer.get_tokenizer(
         True, language=config["data"]["lang"], task=whisper_options.task
@@ -59,24 +63,27 @@ def inference():
     # list
     # dataset = WhisperASRDataset(config["test_manifest"], config["test_root"], whisper_tokenizer)
     # dataset= WhisperFolderNoTextASRDataset(config["test_root"], whisper_tokenizer)
-    dataset = WhisperASRDataset(config["test_manifest"], config["test_root"], whisper_tokenizer)
+    dataset = WhisperASRDataset(
+        config["test_manifest"], config["test_root"], whisper_tokenizer
+    )
 
     loader = torch.utils.data.DataLoader(
-        dataset, batch_size=1,
-        collate_fn=WhisperASRDataCollator()
+        dataset, batch_size=1, collate_fn=WhisperASRDataCollator()
     )
 
     # load models
-    epoch = config["inference"]["epoch_index"]
+    config["inference"]["epoch_index"]
     # checkpoint_path = checkpoint_dir / "checkpoint" / f"srqu-checkpoint-epoch={epoch:04d}.ckpt"
     # state_dict = torch.load(checkpoint_path)
     # state_dict = state_dict['state_dict']
     whisper_model = WhisperModelModule(
-        config["train_manifest"], config["train_root"],
-        config["val_manifest"], config["val_root"],
+        config["train_manifest"],
+        config["train_root"],
+        config["val_manifest"],
+        config["val_root"],
         config["train"],
         model_name=config["model_name"],
-        lang=config["data"]["lang"]
+        lang=config["data"]["lang"],
     )
     # whisper_model.load_state_dict(state_dict)
 
@@ -120,17 +127,19 @@ def inference():
     for i in tqdm(range(len(dataset))):
         audio_path = dataset.manifest[i]["audio"]
         transcript = dataset.manifest[i]["transcript"]
-        hypothesis = transcribe(whisper_model.model, audio_path,
-                                initial_prompt=prompt_str,
-                                language=config["data"]["lang"],
-                                dict_path=config["data"]["dict_path"],
-                                dict_coeff=config["inference"]["dict_coeff"],
-                                beam_size=5,
-                                task="transcribe",
-                                fp16=True,
-                                ngram_path=None,
-                                ngram_coeff=0.001
-                                )
+        hypothesis = transcribe(
+            whisper_model.model,
+            audio_path,
+            initial_prompt=prompt_str,
+            language=config["data"]["lang"],
+            dict_path=config["data"]["dict_path"],
+            dict_coeff=config["inference"]["dict_coeff"],
+            beam_size=5,
+            task="transcribe",
+            fp16=True,
+            ngram_path=None,
+            ngram_coeff=0.001,
+        )
         hyp.append(hypothesis["text"].lower())
         ref.append(transcript)
 
@@ -147,7 +156,6 @@ def inference():
     #         for h in hypothesis:
     #             hyp.append(h.text)
 
-            
     #         for l in label:
     #             l[l == -100] = whisper_tokenizer.eot
     #             r = whisper_tokenizer.decode(l)
@@ -159,22 +167,24 @@ def inference():
 
     # ======================================================
 
-    with open("hypo_ngram_small_no_dict_2.csv", 'w+') as fo:
+    with open("hypo_ngram_small_no_dict_2.csv", "w+") as fo:
         for id, h in zip(utt_ids, hyp):
-            fo.write(id + '\t' + h + '\n')
-    with open("ref_ngram_small_no_dict_2.csv", 'w+') as fo:
+            fo.write(id + "\t" + h + "\n")
+    with open("ref_ngram_small_no_dict_2.csv", "w+") as fo:
         for id, r in zip(utt_ids, ref):
-            fo.write(id + '\t' + r + '\n')
+            fo.write(id + "\t" + r + "\n")
 
     # compute CER
     wer_metrics = evaluate.load("wer")
     wer = wer_metrics.compute(references=ref, predictions=hyp)
     print(f"WER: {wer}")
 
+
 def normalize_text(text):
     text = text.lower()
-    text = text.translate(str.maketrans('', '', string.punctuation))
+    text = text.translate(str.maketrans("", "", string.punctuation))
     return text
+
 
 if __name__ == "__main__":
     inference()
@@ -193,4 +203,3 @@ if __name__ == "__main__":
 
     # wer = wer_metrics.compute(references=refs, predictions=hyps)
     # print(f"WER: {wer}")
-        
